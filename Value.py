@@ -11,24 +11,24 @@ class Value:
         self._backword = lambda :None
 
     def __add__(self, other):
+        other = other if isinstance(Value, other) else Value(other)
         out = Value(self.data + other.data, (self, other), '+')
 
         def _backword():
-            self.grad = 1.0 * out.grad
-            other.grad = 1.0 * out.grad
+            self.grad += 1.0 * out.grad
+            other.grad += 1.0 * out.grad
         out._backword = _backword
         return out
 
-    # def __sub__(self, other):
-    #     out = Value(self.data - other.data, (self, other), '-')
-    #     def _backword():
-
+    def __neg__(self):
+        return self * -1
 
     def __mul__(self, other):
+        other =  other if isinstance(Value,other) else Value(other)
         out = Value(self.data * other.data, (self, other), '*')
         def _backword():
-            self.grad = other.data * out.grad
-            other.grad = self.data * out.grad
+            self.grad += other.data * out.grad
+            other.grad += self.data * out.grad
         out._backword = _backword
         return out
 
@@ -37,7 +37,7 @@ class Value:
         exp = (math.exp(2*x)-1)/(math.exp(2*x)+1)
         out = Value(exp,(self,),'tanh')
         def _backword():
-            self.grad = (1-exp**2 )* out.grad
+            self.grad += (1-exp**2 )* out.grad
         out._backword = _backword
 
         return out
