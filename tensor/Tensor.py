@@ -25,8 +25,8 @@ class Tensor:
     # def __add__(self, other):
     #     out = Tensor(self.data + other.data)
 
-    @classmethod
-    def get_shape(cls, data):
+    @staticmethod
+    def get_shape( data):
         if isinstance(data, list):
             # if isinstance(data[0], list):
             #     currL = len(data[0])
@@ -35,18 +35,40 @@ class Tensor:
             #         if len(arr) != currL:
             #             raise Exception('Invalid shape')
 
-            return (len(data),) + cls.get_shape(data[0])
+            return (len(data),) + Tensor.get_shape(data[0])
         else:
             return ()
-    @classmethod
-    def flatten(cls,data):
+    # returns the 1D representation of the tensor
+    @staticmethod
+    def flatten(data):
         if not isinstance(data, list):
             return [data]
 
         result = []
         for item in data:
-            result.extend(cls.flatten(item))
+            result.extend(Tensor.flatten(item))
         return result
+
+    @staticmethod
+    def reshape(data,shape):
+        if len(shape) == 0:
+            return data[0]
+
+        size = shape[0]
+        step = len(data) // size
+
+        return [ Tensor.reshape(data[i*step:(i+1*step)],shape[1:]) for i in range(size)]
+
+    def reshape_tensor(self,new_shape):
+        flat = Tensor.flatten(self.data)
+        total = 0
+        for ele in new_shape:
+            total *= ele
+        if ele != len(flat):
+            raise Exception("Invalid shape")
+        return Tensor.reshape(flat,new_shape)
+
+
 
 
 
