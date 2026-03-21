@@ -1,18 +1,8 @@
 class Tensor:
-    # def __init__(self, x, _children=(), _op='', label='', requires_grad=True):
-    #     self.data = np.array(x, dtype=float)
-    #     self.grad = np.zeros_like(self.data) if requires_grad else None
-    #     self._prev = set(_children)
-    #     self._backword = lambda: None
-    #     self.shape = self.data.shape
-    #
-    #     self._op = _op
-    #     self.label = label
-
     def __init__(self, x, _children=(), _op='', label='', requires_grad=True):
         self.data = x
         self.shape = Tensor.get_shape(self.data)
-        self.grad = self.zeros_like() if requires_grad else None
+        self.grad = Tensor.zeros_like(self.data) if requires_grad else None
         self.children = set(_children)
         self.op = _op
         self.label = label
@@ -66,12 +56,22 @@ class Tensor:
             raise Exception("Invalid shape")
         return Tensor.reshape(flat, new_shape)
 
-    def zeros_like(self):
-        shape = self.shape
-        data = 0
-        for ele in reversed(shape):
-            data = [data] * ele
-        return data
+    @staticmethod
+    def data_like(shape,fill):
+        if len(shape) == 0:
+            return fill
+        return [Tensor.data_like(shape[1:],fill) for i in range(shape[0])]
+
+
+    @staticmethod
+    def zeros_like(data):
+        shape = data.shape
+        return Tensor(Tensor.data_like(shape,0))
+
+    @staticmethod
+    def ones_like(data):
+        shape = data.shape
+        return Tensor(Tensor.data_like(shape,1))
 
     def backward(self):
         self.grad = Tensor.ones_like(self.data)
