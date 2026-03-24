@@ -1,6 +1,5 @@
 from Value import Value
 import random
-from Viizualizer import draw_dot
 
 
 class Neuron:
@@ -68,8 +67,8 @@ class MLP:
 #
 # ys = [1.0, -1.0, -1.0, 1.0]
 
-xs = [[i/100.0] for i in range(1,101)]
-ys = [(i/100.0)**2 for i in range(1,101)]
+xs = [[i/10.0] for i in range(1,11)]
+ys = [(i/10.0)**2 for i in range(1,11)]
 
 
 n = MLP(1,[4,4,1])
@@ -79,7 +78,7 @@ ypred = [n(x) for x in xs]
 
 
 loss = Value(0)
-for k in range(10000):
+for k in range(1000):
     # forward pass
     ypred = [n(x) for x in xs]
     loss = sum(((x-y)**2 for x,y in zip(ypred,ys)))
