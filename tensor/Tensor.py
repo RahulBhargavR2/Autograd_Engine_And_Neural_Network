@@ -51,15 +51,15 @@ class Tensor:
         size = shape[0]
         step = len(data) // size
 
-        return [Tensor.reshape(data[i * step:(i + 1 * step)], shape[1:]) for i in range(size)]
+        return [Tensor.reshape(data[i * step:(i + 1 )* step], shape[1:]) for i in range(size)]
 
     # main reshape method
     def reshape_tensor(self, new_shape):
         flat = Tensor.flatten(self.data)
-        total = 0
+        total = 1
         for ele in new_shape:
             total *= ele
-        if ele != len(flat):
+        if total != len(flat):
             raise Exception("Invalid shape")
         return Tensor.reshape(flat, new_shape)
 
@@ -76,6 +76,11 @@ class Tensor:
 
     @staticmethod
     def ones_like(data):
+        shape = data.shape
+        return Tensor(Tensor.data_like(shape, 1))
+
+    @staticmethod
+    def ones(data):
         shape = data.shape
         return Tensor.data_like(shape, 1)
 
@@ -180,7 +185,8 @@ class Tensor:
     # instance methods
 
     def backward(self):
-        self.grad = Tensor.ones_like(self)
+        if self.grad is  None:
+            self.grad = Tensor.ones(self)
 
         topo = []
         visited = set()
