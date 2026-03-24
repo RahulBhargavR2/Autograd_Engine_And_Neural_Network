@@ -1,15 +1,22 @@
+from scalar.Viizualizer import draw_dot
+
+
 class Tensor:
     def __init__(self, x, _children=(), _op='', label='', requires_grad=True):
         self.data = x
         self.shape = Tensor.get_shape(self.data)
-        self.grad = Tensor.zeros_like(self.data) if requires_grad else None
-        self.children = set(_children)
-        self.op = _op
+        # use normal list for grad to avoid infinite recursion while creating tensor
+        self.grad = Tensor.data_like(self.shape, 0) if requires_grad else None
+        self._prev = set(_children)
+        self._op = _op
         self.label = label
         self.requires_grad = requires_grad
+        self._backward = lambda: None
 
     def __repr__(self):
         return f"{self.data}"
+
+    # helper methods
 
     @staticmethod
     def get_shape(data):
@@ -57,39 +64,20 @@ class Tensor:
         return Tensor.reshape(flat, new_shape)
 
     @staticmethod
-    def data_like(shape,fill):
+    def data_like(shape, fill):
         if len(shape) == 0:
             return fill
-        return [Tensor.data_like(shape[1:],fill) for i in range(shape[0])]
-
+        return [Tensor.data_like(shape[1:], fill) for i in range(shape[0])]
 
     @staticmethod
     def zeros_like(data):
         shape = data.shape
-        return Tensor(Tensor.data_like(shape,0))
+        return Tensor(Tensor.data_like(shape, 0))
 
     @staticmethod
     def ones_like(data):
         shape = data.shape
-        return Tensor(Tensor.data_like(shape,1))
-
-    def backward(self):
-        self.grad = Tensor.ones_like(self.data)
-
-        topo = []
-        visited = set()
-
-        def build(v):
-            if v not in visited:
-                visited.add(v)
-                for child in v._prev:
-                    build(child)
-                topo.append(v)
-
-        build(self)
-
-        for node in reversed(topo):
-            node._backward()
+        return Tensor.data_like(shape, 1)
 
     @staticmethod
     def broadcast_shape(shape1, shape2):
@@ -102,13 +90,16 @@ class Tensor:
             dim2 = shape2[j] if j >= 0 else 1
 
             if dim1 == dim2:
-                result.append(shape2[j])
+                result.append(dim1)
             elif dim1 == 1:
-                result.append(shape1[i])
+                result.append(dim2)
             elif dim2 == 1:
-                result.append(shape2[i])
+                result.append(dim1)
             else:
                 raise Exception("Shape not broadcastable")
+
+            i -= 1
+            j -= 1
 
         return tuple(reversed(result))
 
@@ -120,7 +111,6 @@ class Tensor:
         while len(current_shape) < len(target_shape):
             data = [data]
             current_shape = (1,) + current_shape
-        print(current_shape, target_shape)
 
         out = Tensor._broadcast_recursive(data, current_shape, target_shape)
 
@@ -187,6 +177,26 @@ class Tensor:
 
         return [Tensor.elementwise_add(x, y) for x, y in zip(a, b)]
 
+    # instance methods
+
+    def backward(self):
+        self.grad = Tensor.ones_like(self)
+
+        topo = []
+        visited = set()
+
+        def build(v):
+            if v not in visited:
+                visited.add(v)
+                for child in v._prev:
+                    build(child)
+                topo.append(v)
+
+        build(self)
+
+        for node in reversed(topo):
+            node._backward()
+
     def __add__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
 
@@ -214,9 +224,76 @@ class Tensor:
         out._backward = _backward
         return out
 
+    @staticmethod
+    def elementwise_mul(a, b):
+        if not isinstance(a, list):
+            return a * b
+        return [Tensor.elementwise_mul(x, y) for x, y in zip(a, b)]
 
-t1 = Tensor([1, 2])
-t2 = Tensor([1, 2])
-print(Tensor.elementwise_add(t1.data, t2.data))
-# print(t.shape)
-# t1 = Tensor.broadcast_to([1, 2], (2, 2))
+    def __mul__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+
+        # 1 get broadcast shape
+        target_shape = Tensor.broadcast_shape(self.shape, other.shape)
+
+        self_a = Tensor.broadcast_to(self.data, target_shape)
+        other_b = Tensor.broadcast_to(other.data, target_shape)
+
+        out = Tensor.elementwise_mul(self_a, other_b)
+        out = Tensor(out, (self, other), '*')
+
+        def _backward():
+            if self.grad is not None:
+                grad = Tensor.elementwise_mul(other_b, out.grad)
+                grad_self = Tensor.unbroadcast(grad, self.shape)
+                self.grad = Tensor.elementwise_add(self.grad, grad_self)
+
+            if other.grad is not None:
+                grad = Tensor.elementwise_mul(self_a, out.grad)
+                grad_other = Tensor.unbroadcast(grad, other.shape)
+                other.grad = Tensor.elementwise_add(other.grad, grad_other)
+
+        out._backward = _backward
+        return out
+
+    # matmul
+    @staticmethod
+    def transpose(matrix):
+        return list(map(list, zip(*matrix)))
+
+    @staticmethod
+    def matmul(matrix_a, matrix_b):
+        result = []
+        for i in range(len(matrix_a)):
+            row = []
+            for j in range(len(matrix_b[0])):
+                total = 0
+                for k in range(len(matrix_a[0])):
+                    total += matrix_a[i][k] * matrix_b[k][j]
+                row.append(total)
+            result.append(row)
+        return result
+
+    def __matmul__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        if self.shape[1] != other.shape[0]:
+            raise Exception("Shapes not compatible for matmul")
+
+        a = self.data
+        b = other.data
+        out = Tensor.matmul(a, b)
+        out = Tensor(out, (self, other), '@')
+
+        def _backward():
+            if self.grad is not None:
+                bt = Tensor.transpose(b)
+                grad_self = Tensor.matmul(out.grad, bt)
+                self.grad = Tensor.elementwise_add(self.grad, grad_self)
+
+            if other.grad is not None:
+                at = Tensor.transpose(a)
+                grad_other = Tensor.matmul(at, out.grad)
+                other.grad = Tensor.elementwise_add(other.grad, grad_other)
+
+        out._backward = _backward
+        return out
