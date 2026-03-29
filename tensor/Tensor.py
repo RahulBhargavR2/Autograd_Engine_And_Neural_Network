@@ -261,6 +261,8 @@ class Tensor:
 
         out._backward = _backward
         return out
+    def __rmul__(self, other):
+        return self * other
 
     # matmul
     @staticmethod
@@ -301,5 +303,36 @@ class Tensor:
                 grad_other = Tensor.matmul(at, out.grad)
                 other.grad = Tensor.elementwise_add(other.grad, grad_other)
 
+        out._backward = _backward
+        return out
+
+    def _map(self,fn,grad_fn=None,name=''):
+        out = Tensor(
+            [[fn(x) for x in row] for row in self.data],
+            (self,),
+            f'{name}',
+        )
+
+        def _backward():
+            if self.grad is not None:
+                for i in range(self.shape[0]):
+                    for j in range(self.shape[1]):
+                        grad = self.grad[i][j]
+                        if grad_fn is not None:
+                            grad = grad_fn(grad)
+                        self.grad[i][j] += grad
+        out._backward = _backward
+        return out
+
+
+
+
+    def relu(self):
+        out = self._map(lambda x : x > 0,lambda x : x > 0)
+        def _backward():
+            if self.grad is not None:
+                for i in range(len(self.grad)):
+                    for j in range(len(self.grad[0])):
+                        self.grad[i][j] += max(0,self.grad[i][j])
         out._backward = _backward
         return out
