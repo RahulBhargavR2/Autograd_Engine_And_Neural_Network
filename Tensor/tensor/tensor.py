@@ -395,4 +395,9 @@ class Tensor:
             lambda v: 1 / (1 + math.exp(-v)),
             lambda v: (1 / (1 + math.exp(-v))) * (1 - 1 / (1 + math.exp(-v)))
         )
+    @staticmethod
+    def elementwise_pow(data,pow = 1):
+        if isinstance(data, (int, float)):
+            return data ** pow
+        return [Tensor.elementwise_pow(x,pow) for x in data]
 
