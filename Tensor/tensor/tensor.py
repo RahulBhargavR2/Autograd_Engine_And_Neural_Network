@@ -1,13 +1,11 @@
 import math
 
-from scalar.Viizualizer import draw_dot
-
 
 class Tensor:
     def __init__(self, x, _children=(), _op='', label='', requires_grad=True):
         self.data = [x] if isinstance(x, (int, float)) else x
         self.shape = Tensor.get_shape(self.data)
-        # use normal list for grad to avoid infinite recursion while creating tensor
+        # to avoid infinite recursive calls grad is provided as false
         self.grad = Tensor(Tensor.data_like(self.shape,0),requires_grad=False) if requires_grad else None
         self._prev = set(_children)
         self._op = _op
@@ -306,7 +304,7 @@ class Tensor:
         return list(map(list, zip(*matrix)))
 
     @staticmethod
-    def matmul(matrix_a, matrix_b):
+    def matrix_mul(matrix_a, matrix_b):
         # print(f"size {len(matrix_a)} x {len(matrix_a[0])}, {len(matrix_b)} X {len(matrix_b[0])}")
         # print(f"{type(matrix_a)}, {type(matrix_b)}")
         result = []
@@ -320,25 +318,35 @@ class Tensor:
             result.append(row)
         return result
 
+    @staticmethod
+    def matmul(tensor_a, tensor_b, shape):
+        if len(shape) == 0:
+            return Tensor.matrix_mul(tensor_a, tensor_b)
+        return [Tensor.matmul(tensor_a[i], tensor_b[i], shape[1:]) for i in range(len(tensor_a))]
+
+
     def __matmul__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
-        if self.shape[1] != other.shape[0]:
+        if self.shape[len(self.shape)-1] != other.shape[len(self.shape)-2]:
             raise Exception("Shapes not compatible for matmul")
 
-        a = self.data
-        b = other.data
-        out = Tensor.matmul(a, b)
+        comm_shape = Tensor.broadcast_shape(self.shape[:-2], other.shape[:-2])
+
+        a = Tensor.broadcast_to(self.data, comm_shape + self.shape[-2:])
+        b = Tensor.broadcast_to(other.data, comm_shape+other.shape[-2:])
+
+        out = Tensor.matmul(a, b,comm_shape)
         out = Tensor(out, (self, other), '@')
 
         def _backward():
             if self.requires_grad:
                 bt = Tensor.transpose(b)
-                grad_self = Tensor.matmul(out.grad.data, bt)
+                grad_self = Tensor.matmul(out.grad.data, bt,comm_shape)
                 self.grad.data = Tensor.elementwise_add(self.grad.data, grad_self)
 
             if other.requires_grad:
                 at = Tensor.transpose(a)
-                grad_other = Tensor.matmul(at, out.grad.data)
+                grad_other = Tensor.matmul(at, out.grad.data,comm_shape)
                 other.grad.data = Tensor.elementwise_add(other.grad.data, grad_other)
 
         out._backward = _backward
