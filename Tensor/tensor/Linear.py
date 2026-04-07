@@ -1,7 +1,11 @@
 import random
+from Tensor.optimizers.Adam import Adam
+from Tensor.optimizers.RMSprop import RMSProp
 from Tensor.tensor.tensor import Tensor
 
-from Tensor.optimizers.sgd import SGD
+from Tensor.optimizers.sgd import SGD, SGDMomentum
+from scalar.Viizualizer import draw_dot
+
 
 class Linear:
     # we consider columns as the neurons and rows as inputs
@@ -21,28 +25,36 @@ class Linear:
 
 
 class MLP:
-    def __init__(self):
-        self.l1 = Linear(2, 4)
-        self.l2 = Linear(4, 1)
+    def __init__(self,nin,nouts):
+        eles = [nin] + nouts
+        self.layers = []
+
+        for i in range (len(nouts)):
+            self.layers.append(Linear(eles[i],eles[i+1]))
 
     def __call__(self, x):
-        x = self.l1(x)
-        x = x.relu()
-        x = self.l2(x)
-        x = x.sigmoid()
+        for i,layer in enumerate(self.layers):
+            x = layer(x)
+            if i != len(self.layers) - 1:
+                x = x.relu()
+            else:
+                x = x.sigmoid()
         return x
 
     def parameters(self):
-        return self.l1.parameters() + self.l2.parameters()
+        parameters = []
+        for layer in self.layers:
+            parameters.extend(layer.parameters())
+        return parameters
 
 
 def mse_loss(y_pred, y_true):
     diff = y_pred - y_true
     return (diff * diff).mean()
 
-if __name__ == "__main__":
 
-    model = MLP()
+def normal():
+    model = MLP(2,[4,4,1])
     lr = 0.01
 
     X = Tensor([
@@ -70,7 +82,7 @@ if __name__ == "__main__":
         # print(len(model.parameters()))
         # do not re assign a new tensor, just mutate the data
         for p in model.parameters():
-            p.grad.data = Tensor.data_like(p.shape,0)
+            p.grad.data = Tensor.data_like(p.shape, 0)
 
         # Backward
         # print("loss:",loss)
@@ -89,3 +101,36 @@ if __name__ == "__main__":
 
     print("Predictions:")
     print(model(X).data)
+
+
+def using_sgd():
+    model = MLP(2,[4,4,1])
+    lr = 0.01
+
+    X = Tensor([
+        [0.0, 0.0],
+        [0.0, 1.0],
+        [1.0, 0.0],
+        [1.0, 1.0]
+    ])
+
+    Y = Tensor([
+        [0.0],
+        [1.0],
+        [1.0],
+        [0.0]
+    ])
+    optimizer = Adam(model.parameters(), lr)
+
+    for epoch in range(10000):
+        y_pred = model(X)
+        optimizer.zero_grad()
+        loss = mse_loss(y_pred, Y)
+        loss.backward()
+        optimizer.step()
+    print("Predictions:", y_pred)
+
+
+if __name__ == "__main__":
+    # normal()
+    using_sgd()
