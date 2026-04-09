@@ -1,4 +1,6 @@
 import random
+from operator import index
+
 from Tensor.optimizers.Adam import Adam
 from Tensor.optimizers.RMSprop import RMSProp
 from Tensor.tensor.tensor import Tensor
@@ -112,23 +114,32 @@ def using_sgd():
         [0.0, 1.0],
         [1.0, 0.0],
         [1.0, 1.0]
-    ])
+    ],requires_grad=False)
 
     Y = Tensor([
         [0.0],
         [1.0],
         [1.0],
         [0.0]
-    ])
+    ],requires_grad=False)
     optimizer = Adam(model.parameters(), lr)
+    batch_size = 2
 
     for epoch in range(10000):
-        y_pred = model(X)
-        optimizer.zero_grad()
-        loss = mse_loss(y_pred, Y)
-        loss.backward()
-        optimizer.step()
-    print("Predictions:", y_pred)
+        index = list(range(4))
+        random.shuffle(index)
+        for i in range(0,4,batch_size):
+            batch_idx = index[i:i+batch_size]
+
+            x_batch = X[batch_idx]
+            y_batch = Y[batch_idx]
+
+            y_pred = model(x_batch)
+            optimizer.zero_grad()
+            loss = mse_loss(y_pred, y_batch)
+            loss.backward()
+            optimizer.step()
+        print("Predictions:", y_pred)
 
 
 if __name__ == "__main__":

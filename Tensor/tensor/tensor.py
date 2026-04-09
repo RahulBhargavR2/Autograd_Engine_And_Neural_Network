@@ -409,3 +409,7 @@ class Tensor:
             return data ** pow
         return [Tensor.elementwise_pow(x,pow) for x in data]
 
+    def __getitem__(self, idx):
+        if isinstance(idx, list):
+            return Tensor([ self.data[i] for i in idx])
+        return Tensor(self.data[idx])
