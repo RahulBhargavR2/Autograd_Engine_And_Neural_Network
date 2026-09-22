@@ -15,7 +15,7 @@ class SGD(Optimizer):
                 p.data = Tensor.elementwise_add(p.data, Tensor.elementwise_mul(p.grad.data, -self.lr))
 
 
-class SGD_momentum(Optimizer):
+class SGDMomentum(Optimizer):
     def __init__(self, params, lr=0.01, beta=0.9):
         super().__init__(params)
         self.lr = lr

@@ -392,7 +392,21 @@ class Tensor:
     def mean(self):
         out = self.sum() * (1.0 / self.numel())
         out._op = 'mean'
+        out._prev = (self,)
         return out
+
+    @staticmethod
+    def elementwise_pow(data, pow=1):
+        if isinstance(data, (int, float)):
+            return data ** pow
+        return [Tensor.elementwise_pow(x, pow) for x in data]
+
+    def __getitem__(self, idx):
+        if isinstance(idx, list):
+            return Tensor([self.data[i] for i in idx])
+        return Tensor(self.data[idx])
+
+
 
     # activation functions
     def relu(self):
@@ -403,13 +417,6 @@ class Tensor:
             lambda v: 1 / (1 + math.exp(-v)),
             lambda v: (1 / (1 + math.exp(-v))) * (1 - 1 / (1 + math.exp(-v)))
         )
-    @staticmethod
-    def elementwise_pow(data,pow = 1):
-        if isinstance(data, (int, float)):
-            return data ** pow
-        return [Tensor.elementwise_pow(x,pow) for x in data]
 
-    def __getitem__(self, idx):
-        if isinstance(idx, list):
-            return Tensor([ self.data[i] for i in idx])
-        return Tensor(self.data[idx])
+    def softmax(self):
+        pass
